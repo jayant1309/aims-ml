@@ -8,6 +8,7 @@ This project turns a radiation cascade simulation into an ML-focused materials s
 - Builds a dataset by sweeping irradiation and simulation parameters.
 - Trains surrogate ML models to predict damage metrics faster than full simulations.
 - Includes interactive 3D cascade visualization for notebook/Colab demos.
+- Includes OOD-by-material evaluation and permutation feature importance diagnostics.
 
 ## ML Relevance
 
@@ -54,6 +55,9 @@ python scripts/generate_dataset.py --n-runs 500 --out data/sim_runs.csv
 ```bash
 python scripts/train_models.py --dataset data/sim_runs.csv --target all --artifacts-dir artifacts
 ```
+This also writes:
+- `artifacts/metrics_ood_all_targets.csv`
+- `artifacts/feature_importance_all_targets.csv`
 
 3. Run one simulation and save plots:
 

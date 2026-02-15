@@ -148,8 +148,6 @@ def plot_cascade_3d_animated(
     events = result.get("displacement_events", [])
     paths = [path for path in result["projectile_paths"] if len(path) > 0]
 
-    if not events:
-        raise ValueError("No displacement events available to animate.")
     if stride < 1:
         raise ValueError("stride must be >= 1")
 
@@ -158,6 +156,47 @@ def plot_cascade_3d_animated(
         lattice_points = atomic_coords[idx]
     else:
         lattice_points = atomic_coords
+
+    if not events:
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter3d(
+                x=lattice_points[:, 0],
+                y=lattice_points[:, 1],
+                z=lattice_points[:, 2],
+                mode="markers",
+                name="Lattice (sampled)",
+                marker={"size": 2, "color": "#7a7a7a", "opacity": 0.12},
+                hoverinfo="skip",
+            )
+        )
+        for i, path in enumerate(paths):
+            fig.add_trace(
+                go.Scatter3d(
+                    x=path[:, 0],
+                    y=path[:, 1],
+                    z=path[:, 2],
+                    mode="lines",
+                    name=f"Projectile path {i + 1}",
+                    line={"width": 2, "color": "#457b9d"},
+                    opacity=0.55,
+                )
+            )
+        fig.update_layout(
+            title="3D Radiation Damage Animation (No displacement events in this run)",
+            scene={
+                "xaxis_title": "X (A)",
+                "yaxis_title": "Y (A)",
+                "zaxis_title": "Z (A)",
+            },
+            template="plotly_white",
+            width=950,
+            height=700,
+        )
+        if out_html:
+            Path(out_html).parent.mkdir(parents=True, exist_ok=True)
+            fig.write_html(out_html, include_plotlyjs="cdn")
+        return fig
 
     base_traces = [
         go.Scatter3d(
