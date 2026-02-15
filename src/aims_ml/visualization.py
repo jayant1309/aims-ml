@@ -141,14 +141,15 @@ def plot_cascade_3d_animated(
     sample_atoms: int = 4000,
     stride: int = 1,
     frame_duration_ms: int = 80,
+    show_projectile_paths: bool = False,
     out_html: str | None = None,
 ) -> go.Figure:
     atomic_coords = result["atomic_coords"]
-    displaced = result["displaced_atoms"]
+    events = result.get("displacement_events", [])
     paths = [path for path in result["projectile_paths"] if len(path) > 0]
 
-    if not paths:
-        raise ValueError("No projectile paths available to animate.")
+    if not events:
+        raise ValueError("No displacement events available to animate.")
     if stride < 1:
         raise ValueError("stride must be >= 1")
 
@@ -170,59 +171,109 @@ def plot_cascade_3d_animated(
         )
     ]
 
-    if len(displaced) > 0:
-        base_traces.append(
-            go.Scatter3d(
-                x=displaced[:, 0],
-                y=displaced[:, 1],
-                z=displaced[:, 2],
-                mode="markers",
-                name="Displaced atoms",
-                marker={"size": 4, "color": "#e63946", "opacity": 0.9},
-            )
-        )
+    max_step = max(int(e["event_step"]) for e in events)
+    steps = list(range(1, max_step + 1, stride))
+    if steps[-1] != max_step:
+        steps.append(max_step)
 
-    max_len = max(len(path) for path in paths)
-    steps = list(range(1, max_len + 1, stride))
-    if steps[-1] != max_len:
-        steps.append(max_len)
+    def _event_arrays(frame_step: int) -> tuple[np.ndarray, np.ndarray]:
+        vacancy_list = []
+        displaced_list = []
+        for event in events:
+            event_step = int(event["event_step"])
+            if event_step <= frame_step:
+                vacancy_list.append(event["vacancy_pos"])
+                frac = min(1.0, max(0.0, (frame_step - event_step + 1) / max(1, stride)))
+                start = np.array(event["vacancy_pos"])
+                end = np.array(event["interstitial_pos"])
+                displaced_list.append(start + frac * (end - start))
 
+        vacancies = np.array(vacancy_list) if vacancy_list else np.empty((0, 3))
+        displaced = np.array(displaced_list) if displaced_list else np.empty((0, 3))
+        return vacancies, displaced
+
+    init_vacancies, init_displaced = _event_arrays(steps[0])
     init_data = list(base_traces)
-    for i, path in enumerate(paths):
-        segment = path[:1]
-        init_data.append(
-            go.Scatter3d(
-                x=segment[:, 0],
-                y=segment[:, 1],
-                z=segment[:, 2],
-                mode="lines",
-                name=f"Particle path {i + 1}",
-                line={"width": 4, "color": "#1d3557"},
-                opacity=0.85,
-            )
+    init_data.append(
+        go.Scatter3d(
+            x=init_vacancies[:, 0],
+            y=init_vacancies[:, 1],
+            z=init_vacancies[:, 2],
+            mode="markers",
+            name="Vacancies",
+            marker={"size": 4, "color": "#111111", "opacity": 0.95, "symbol": "circle-open"},
         )
+    )
+    init_data.append(
+        go.Scatter3d(
+            x=init_displaced[:, 0],
+            y=init_displaced[:, 1],
+            z=init_displaced[:, 2],
+            mode="markers",
+            name="Displaced atoms (moving)",
+            marker={"size": 5, "color": "#e63946", "opacity": 0.9},
+        )
+    )
 
-    frames = []
-    for step in steps:
-        frame_data = list(base_traces)
+    if show_projectile_paths:
         for i, path in enumerate(paths):
-            segment = path[: min(step, len(path))]
-            frame_data.append(
+            segment = path[:1]
+            init_data.append(
                 go.Scatter3d(
                     x=segment[:, 0],
                     y=segment[:, 1],
                     z=segment[:, 2],
                     mode="lines",
-                    name=f"Particle path {i + 1}",
-                    line={"width": 4, "color": "#1d3557"},
-                    opacity=0.85,
+                    name=f"Projectile path {i + 1}",
+                    line={"width": 2, "color": "#457b9d"},
+                    opacity=0.55,
                 )
             )
+
+    frames = []
+    for step in steps:
+        frame_data = list(base_traces)
+        frame_vacancies, frame_displaced = _event_arrays(step)
+        frame_data.append(
+            go.Scatter3d(
+                x=frame_vacancies[:, 0],
+                y=frame_vacancies[:, 1],
+                z=frame_vacancies[:, 2],
+                mode="markers",
+                name="Vacancies",
+                marker={"size": 4, "color": "#111111", "opacity": 0.95, "symbol": "circle-open"},
+            )
+        )
+        frame_data.append(
+            go.Scatter3d(
+                x=frame_displaced[:, 0],
+                y=frame_displaced[:, 1],
+                z=frame_displaced[:, 2],
+                mode="markers",
+                name="Displaced atoms (moving)",
+                marker={"size": 5, "color": "#e63946", "opacity": 0.9},
+            )
+        )
+
+        if show_projectile_paths:
+            for i, path in enumerate(paths):
+                segment = path[: min(step, len(path))]
+                frame_data.append(
+                    go.Scatter3d(
+                        x=segment[:, 0],
+                        y=segment[:, 1],
+                        z=segment[:, 2],
+                        mode="lines",
+                        name=f"Projectile path {i + 1}",
+                        line={"width": 2, "color": "#457b9d"},
+                        opacity=0.55,
+                    )
+                )
         frames.append(go.Frame(data=frame_data, name=str(step)))
 
     fig = go.Figure(data=init_data, frames=frames)
     fig.update_layout(
-        title="3D Radiation Cascade (Animated)",
+        title="3D Radiation Damage Animation (Vacancies + Displaced Atoms)",
         scene={
             "xaxis_title": "X (A)",
             "yaxis_title": "Y (A)",

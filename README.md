@@ -77,7 +77,13 @@ fig.show()
 ```python
 from aims_ml.visualization import plot_cascade_3d_animated
 
-fig = plot_cascade_3d_animated(result, sample_atoms=4000, stride=2, frame_duration_ms=60)
+fig = plot_cascade_3d_animated(
+    result,
+    sample_atoms=4000,
+    stride=2,
+    frame_duration_ms=60,
+    show_projectile_paths=False,
+)
 fig.show()
 ```
 

@@ -13,6 +13,9 @@ def test_simulation_returns_expected_keys() -> None:
         "stats",
         "atomic_coords",
         "displaced_atoms",
+        "displaced_final_positions",
+        "vacancy_positions",
+        "displacement_events",
         "projectile_paths",
         "energy_history",
         "damage_hist",
@@ -22,6 +25,7 @@ def test_simulation_returns_expected_keys() -> None:
 
     assert result["atomic_coords"].shape[1] == 3
     assert result["damage_hist"].shape[0] == 10
+    assert len(result["displacement_events"]) == result["stats"]["total_displacements"]
 
 
 def test_simulation_reproducible_with_seed() -> None:

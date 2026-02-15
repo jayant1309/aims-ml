@@ -24,6 +24,7 @@ class SimConfig:
     incidence_theta_deg: float = 0.0
     incidence_phi_deg: float = 0.0
     projectile_mass_amu: float = 1.0
+    displacement_jump_scale: float = 1.5
     random_seed: int | None = None
 
 
@@ -46,8 +47,12 @@ def simulate_cascade(config: SimConfig) -> dict:
 
     displaced_mask = np.zeros(len(atomic_coords), dtype=bool)
     displaced_atoms: list[np.ndarray] = []
+    displaced_final_positions: list[np.ndarray] = []
+    vacancy_positions: list[np.ndarray] = []
+    displacement_events: list[dict] = []
     projectile_paths: list[np.ndarray] = []
     energy_history: list[tuple[float, float]] = []
+    global_step = 0
 
     center_x = (box_min[0] + box_max[0]) / 2
     center_y = (box_min[1] + box_max[1]) / 2
@@ -76,6 +81,7 @@ def simulate_cascade(config: SimConfig) -> dict:
 
         while energy > material.displacement_threshold_ev and steps < config.max_steps_per_particle:
             steps += 1
+            global_step += 1
             pos = pos + direction * config.step_size_a
             path.append(pos.copy())
             energy_history.append((float(pos[2]), energy))
@@ -93,16 +99,38 @@ def simulate_cascade(config: SimConfig) -> dict:
                 if e_transfer > material.displacement_threshold_ev and not displaced_mask[idx]:
                     displaced_mask[idx] = True
                     displaced_atoms.append(target_pos)
+                    vacancy_positions.append(target_pos.copy())
 
                     if len(active_particles) < config.max_total_particles:
                         new_dir = rng.normal(size=3)
                         new_dir = new_dir / np.linalg.norm(new_dir)
+                        displaced_end = target_pos + (
+                            new_dir * config.interaction_radius_a * config.displacement_jump_scale
+                        )
+                        displaced_end = np.clip(displaced_end, box_min, box_max)
+                        displaced_final_positions.append(displaced_end)
+                        displacement_events.append(
+                            {
+                                "event_step": int(global_step),
+                                "vacancy_pos": target_pos.copy(),
+                                "interstitial_pos": displaced_end.copy(),
+                            }
+                        )
                         active_particles.append(
                             {
                                 "pos": target_pos.copy(),
                                 "dir": new_dir,
                                 "energy": float(e_transfer),
                                 "mass": target_mass,
+                            }
+                        )
+                    else:
+                        displaced_final_positions.append(target_pos.copy())
+                        displacement_events.append(
+                            {
+                                "event_step": int(global_step),
+                                "vacancy_pos": target_pos.copy(),
+                                "interstitial_pos": target_pos.copy(),
                             }
                         )
                     energy -= e_transfer
@@ -114,6 +142,10 @@ def simulate_cascade(config: SimConfig) -> dict:
         projectile_paths.append(np.array(path))
 
     displaced_arr = np.array(displaced_atoms) if displaced_atoms else np.empty((0, 3))
+    displaced_final_arr = (
+        np.array(displaced_final_positions) if displaced_final_positions else np.empty((0, 3))
+    )
+    vacancy_arr = np.array(vacancy_positions) if vacancy_positions else np.empty((0, 3))
     energy_arr = np.array(energy_history) if energy_history else np.empty((0, 2))
 
     if len(displaced_arr) > 0:
@@ -148,6 +180,9 @@ def simulate_cascade(config: SimConfig) -> dict:
         "stats": stats,
         "atomic_coords": atomic_coords,
         "displaced_atoms": displaced_arr,
+        "displaced_final_positions": displaced_final_arr,
+        "vacancy_positions": vacancy_arr,
+        "displacement_events": displacement_events,
         "projectile_paths": projectile_paths,
         "energy_history": energy_arr,
         "damage_hist": damage_hist,
