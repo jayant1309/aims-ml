@@ -91,6 +91,21 @@ fig = plot_cascade_3d_animated(
 fig.show()
 ```
 
+6. Explainer 3D view (slider, event counter, camera presets):
+
+```python
+from aims_ml.visualization import plot_cascade_3d_explainer
+
+fig = plot_cascade_3d_explainer(
+    result,
+    sample_atoms=2500,
+    stride=2,
+    roi_padding_a=4.0,
+    show_paths=False,
+)
+fig.show()
+```
+
 ## Reproducible Config-Driven Runs
 
 ```bash
