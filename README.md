@@ -7,6 +7,7 @@ This project turns a radiation cascade simulation into an ML-focused materials s
 - Simulates atomic displacement cascades in crystalline materials (Al, Ti, Fe, Cu).
 - Builds a dataset by sweeping irradiation and simulation parameters.
 - Trains surrogate ML models to predict damage metrics faster than full simulations.
+- Includes interactive 3D cascade visualization for notebook/Colab demos.
 
 ## ML Relevance
 
@@ -58,6 +59,17 @@ python scripts/train_models.py --dataset data/sim_runs.csv --target all --artifa
 
 ```bash
 python scripts/run_single_simulation.py --material Al --initial-energy-ev 40000 --seed 42
+```
+
+4. Interactive 3D visualization in notebook/Colab:
+
+```python
+from aims_ml.simulation import SimConfig, simulate_cascade
+from aims_ml.visualization import plot_cascade_3d_interactive
+
+result = simulate_cascade(SimConfig(material="Al", random_seed=42))
+fig = plot_cascade_3d_interactive(result, sample_atoms=6000)
+fig.show()
 ```
 
 ## Reproducible Config-Driven Runs
