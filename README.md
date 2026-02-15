@@ -72,6 +72,15 @@ fig = plot_cascade_3d_interactive(result, sample_atoms=6000)
 fig.show()
 ```
 
+5. Animated 3D cascade in notebook/Colab:
+
+```python
+from aims_ml.visualization import plot_cascade_3d_animated
+
+fig = plot_cascade_3d_animated(result, sample_atoms=4000, stride=2, frame_duration_ms=60)
+fig.show()
+```
+
 ## Reproducible Config-Driven Runs
 
 ```bash

@@ -134,3 +134,138 @@ def plot_cascade_3d_interactive(
         fig.write_html(out_html, include_plotlyjs="cdn")
 
     return fig
+
+
+def plot_cascade_3d_animated(
+    result: dict,
+    sample_atoms: int = 4000,
+    stride: int = 1,
+    frame_duration_ms: int = 80,
+    out_html: str | None = None,
+) -> go.Figure:
+    atomic_coords = result["atomic_coords"]
+    displaced = result["displaced_atoms"]
+    paths = [path for path in result["projectile_paths"] if len(path) > 0]
+
+    if not paths:
+        raise ValueError("No projectile paths available to animate.")
+    if stride < 1:
+        raise ValueError("stride must be >= 1")
+
+    if len(atomic_coords) > sample_atoms:
+        idx = np.random.default_rng(42).choice(len(atomic_coords), size=sample_atoms, replace=False)
+        lattice_points = atomic_coords[idx]
+    else:
+        lattice_points = atomic_coords
+
+    base_traces = [
+        go.Scatter3d(
+            x=lattice_points[:, 0],
+            y=lattice_points[:, 1],
+            z=lattice_points[:, 2],
+            mode="markers",
+            name="Lattice (sampled)",
+            marker={"size": 2, "color": "#7a7a7a", "opacity": 0.12},
+            hoverinfo="skip",
+        )
+    ]
+
+    if len(displaced) > 0:
+        base_traces.append(
+            go.Scatter3d(
+                x=displaced[:, 0],
+                y=displaced[:, 1],
+                z=displaced[:, 2],
+                mode="markers",
+                name="Displaced atoms",
+                marker={"size": 4, "color": "#e63946", "opacity": 0.9},
+            )
+        )
+
+    max_len = max(len(path) for path in paths)
+    steps = list(range(1, max_len + 1, stride))
+    if steps[-1] != max_len:
+        steps.append(max_len)
+
+    init_data = list(base_traces)
+    for i, path in enumerate(paths):
+        segment = path[:1]
+        init_data.append(
+            go.Scatter3d(
+                x=segment[:, 0],
+                y=segment[:, 1],
+                z=segment[:, 2],
+                mode="lines",
+                name=f"Particle path {i + 1}",
+                line={"width": 4, "color": "#1d3557"},
+                opacity=0.85,
+            )
+        )
+
+    frames = []
+    for step in steps:
+        frame_data = list(base_traces)
+        for i, path in enumerate(paths):
+            segment = path[: min(step, len(path))]
+            frame_data.append(
+                go.Scatter3d(
+                    x=segment[:, 0],
+                    y=segment[:, 1],
+                    z=segment[:, 2],
+                    mode="lines",
+                    name=f"Particle path {i + 1}",
+                    line={"width": 4, "color": "#1d3557"},
+                    opacity=0.85,
+                )
+            )
+        frames.append(go.Frame(data=frame_data, name=str(step)))
+
+    fig = go.Figure(data=init_data, frames=frames)
+    fig.update_layout(
+        title="3D Radiation Cascade (Animated)",
+        scene={
+            "xaxis_title": "X (A)",
+            "yaxis_title": "Y (A)",
+            "zaxis_title": "Z (A)",
+        },
+        template="plotly_white",
+        width=950,
+        height=700,
+        legend={"itemsizing": "constant"},
+        updatemenus=[
+            {
+                "type": "buttons",
+                "showactive": True,
+                "buttons": [
+                    {
+                        "label": "Play",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "frame": {"duration": frame_duration_ms, "redraw": True},
+                                "fromcurrent": True,
+                            },
+                        ],
+                    },
+                    {
+                        "label": "Pause",
+                        "method": "animate",
+                        "args": [
+                            [None],
+                            {
+                                "frame": {"duration": 0, "redraw": False},
+                                "mode": "immediate",
+                            },
+                        ],
+                    },
+                ],
+            }
+        ],
+    )
+
+    if out_html:
+        Path(out_html).parent.mkdir(parents=True, exist_ok=True)
+        fig.write_html(out_html, include_plotlyjs="cdn")
+
+    return fig
